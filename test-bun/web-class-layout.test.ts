@@ -8,6 +8,7 @@ import {
   createClassLayoutState,
   resolveClassLayoutSheet,
   retainClassAssignments,
+  resolveClassComponentChoice,
 } from '../src/viewers/web/chrome/class-layout.ts'
 import { box, worldOf } from './helpers.ts'
 
@@ -64,7 +65,7 @@ test.concurrent('class assignments only retain existing components across a live
 
 test.concurrent('the map control exposes both layout modes, typed spacing, and all explicit classes', () => {
   const markup = classLayoutControl()
-  for (const id of ['class-layout-mode', 'class-layout-sibling', 'class-layout-group', 'class-layout-island', 'class-layout-class', 'class-layout-assign']) {
+  for (const id of ['class-layout-mode', 'class-layout-sibling', 'class-layout-group', 'class-layout-island', 'class-layout-component', 'class-layout-class', 'class-layout-assign']) {
     assert.equal(markup.includes(`id="${id}"`), true)
   }
   for (const objectClass of ['Dataset', 'Service', 'Decision', 'Artifact', 'Event', 'Project', 'Rule', 'Preference']) {
@@ -77,4 +78,21 @@ test.concurrent('the map control exposes both layout modes, typed spacing, and a
 test.concurrent('the Layout control clears the normal native details inspector', () => {
   assert.match(classLayoutCss, /right: calc\(var\(--details-inset\) \+ 24px\)/)
   assert.match(classLayoutCss, /top: 74px; right: calc\(var\(--details-inset\) \+ 24px\); z-index: 7/)
+})
+
+test.concurrent('direct component choice works without map selection and tracks new map picks', () => {
+  const world = worldOf([
+    box('system', 'system', unit),
+    box('first', 'component', unit, { parent: 'observed:system' }),
+    box('second', 'component', unit, { parent: 'observed:system' }),
+  ])
+  const first = world.world.elements.find(item => item.representationId === 'observed:first')!
+  const second = world.world.elements.find(item => item.representationId === 'observed:second')!
+  const system = world.world.elements.find(item => item.kind === 'system')!
+  const components = world.world.elements.filter(item => item.kind === 'component')
+  assert.equal(resolveClassComponentChoice(components, system, undefined, first.representationId), first.representationId)
+  assert.equal(resolveClassComponentChoice(components, undefined, undefined, second.representationId), second.representationId)
+  assert.equal(resolveClassComponentChoice(components, first, undefined, second.representationId), first.representationId)
+  assert.equal(resolveClassComponentChoice(components, first, first.representationId, second.representationId), second.representationId)
+  assert.equal(resolveClassComponentChoice(components, system, undefined, 'observed:gone'), undefined)
 })
