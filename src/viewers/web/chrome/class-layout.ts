@@ -22,6 +22,7 @@ export interface ClassLayoutControlOptions {
   selected: () => AnnotatedElement | undefined
   components: () => readonly AnnotatedElement[]
   apply: () => void
+  focus: (id: string) => void
 }
 
 export interface ClassLayoutControlBinding {
@@ -69,9 +70,15 @@ export function resolveClassComponentChoice(
   return components.some(item => item.kind === 'component' && item.representationId === proposed) ? proposed : undefined
 }
 
+/** Visible confirmation without implying the assignment was persisted or applied to the ontology. */
+export function classAssignmentFeedback(name: string, objectClass: SemanticObjectClass | undefined, preset: LayoutPreset): string {
+  const change = objectClass === undefined ? `Cleared class for ${name}` : `Assigned ${name} → ${objectClass}`
+  return `${change} · session only${preset === 'default' ? ' · switch to Class clusters to see the shape' : ''}`
+}
+
 export function classLayoutControl(): string {
   const classes = SEMANTIC_OBJECT_CLASSES.map(objectClass => `<option value="${objectClass}">${objectClass}</option>`).join('')
-  return `<details id="class-layout" class="floating-map-bar"><summary aria-label="Presentation layout" title="Presentation layout"><span>Layout</span><span class="class-layout-chevron"></span></summary><div class="class-layout-popover" role="group" aria-label="Presentation layout controls"><label>Mode<select id="class-layout-mode"><option value="default">Original</option><option value="class-clusters">Class clusters</option></select></label><label>Sibling spacing<span class="class-layout-range"><input id="class-layout-sibling" type="range" min="2" max="12" step="1"><output for="class-layout-sibling"></output></span></label><label>Group spacing<span class="class-layout-range"><input id="class-layout-group" type="range" min="2" max="12" step="1"><output for="class-layout-group"></output></span></label><label>Island spacing<span class="class-layout-range"><input id="class-layout-island" type="range" min="3" max="16" step="1"><output for="class-layout-island"></output></span></label><fieldset><legend>Assign class</legend><label>Component<select id="class-layout-component"><option value="">Choose component</option></select></label><label>Class<select id="class-layout-class"><option value="">Unassigned</option>${classes}</select></label><button id="class-layout-assign" type="button">Assign class</button></fieldset></div></details>`
+  return `<details id="class-layout" class="floating-map-bar"><summary aria-label="Presentation layout" title="Presentation layout"><span>Layout</span><span class="class-layout-chevron"></span></summary><div class="class-layout-popover" role="group" aria-label="Presentation layout controls"><label>Mode<select id="class-layout-mode"><option value="default">Original</option><option value="class-clusters">Class clusters</option></select></label><label>Sibling spacing<span class="class-layout-range"><input id="class-layout-sibling" type="range" min="2" max="12" step="1"><output for="class-layout-sibling"></output></span></label><label>Group spacing<span class="class-layout-range"><input id="class-layout-group" type="range" min="2" max="12" step="1"><output for="class-layout-group"></output></span></label><label>Island spacing<span class="class-layout-range"><input id="class-layout-island" type="range" min="3" max="16" step="1"><output for="class-layout-island"></output></span></label><fieldset><legend>Assign class</legend><label>Component<select id="class-layout-component"><option value="">Choose component</option></select></label><output id="class-layout-current"></output><label>Class<select id="class-layout-class"><option value="">Unassigned</option>${classes}</select></label><button id="class-layout-assign" type="button">Assign class</button><output id="class-layout-feedback" role="status" aria-live="polite"></output></fieldset></div></details>`
 }
 
 export function bindClassLayoutControl(host: HTMLElement, options: ClassLayoutControlOptions): ClassLayoutControlBinding {
@@ -83,6 +90,8 @@ export function bindClassLayoutControl(host: HTMLElement, options: ClassLayoutCo
   const classSelect = host.querySelector<HTMLSelectElement>('#class-layout-class')!
   const assign = host.querySelector<HTMLButtonElement>('#class-layout-assign')!
   const componentSelect = host.querySelector<HTMLSelectElement>('#class-layout-component')!
+  const currentClass = host.querySelector<HTMLOutputElement>('#class-layout-current')!
+  const feedback = host.querySelector<HTMLOutputElement>('#class-layout-feedback')!
   let chosenId: string | undefined
   let previousMapId: string | undefined
   const components = () => options.components().filter(item => item.kind === 'component')
@@ -97,14 +106,19 @@ export function bindClassLayoutControl(host: HTMLElement, options: ClassLayoutCo
   for (const [input] of ranges) input.addEventListener('input', updateSpacing)
   componentSelect.addEventListener('change', () => {
     chosenId = componentSelect.value || undefined
+    feedback.textContent = ''
     refresh()
   })
+  classSelect.addEventListener('change', () => { feedback.textContent = '' })
   assign.addEventListener('click', () => {
     const component = components().find(item => item.representationId === chosenId)
     if (component === undefined) return
-    if (classSelect.value === '') options.state.classByElementId.delete(component.representationId)
-    else options.state.classByElementId.set(component.representationId, classSelect.value as SemanticObjectClass)
+    const objectClass = classSelect.value === '' ? undefined : classSelect.value as SemanticObjectClass
+    if (objectClass === undefined) options.state.classByElementId.delete(component.representationId)
+    else options.state.classByElementId.set(component.representationId, objectClass)
+    feedback.textContent = classAssignmentFeedback(component.title, objectClass, options.state.preset)
     options.apply()
+    options.focus(component.representationId)
   })
   const refresh = (): void => {
     mode.value = options.state.preset
@@ -117,12 +131,18 @@ export function bindClassLayoutControl(host: HTMLElement, options: ClassLayoutCo
     chosenId = resolveClassComponentChoice(list, mapSelected, previousMapId, chosenId)
     previousMapId = mapSelected?.kind === 'component' ? mapSelected.representationId : undefined
     componentSelect.replaceChildren(new Option('Choose component', ''))
-    for (const component of list) componentSelect.add(new Option(component.title, component.representationId))
+    for (const component of list) {
+      const objectClass = options.state.classByElementId.get(component.representationId)
+      componentSelect.add(new Option(objectClass === undefined ? component.title : `${component.title} (${objectClass})`, component.representationId))
+    }
     componentSelect.value = chosenId ?? ''
     const component = list.find(item => item.representationId === chosenId)
-    classSelect.value = component === undefined ? '' : options.state.classByElementId.get(component.representationId) ?? ''
+    const objectClass = component === undefined ? undefined : options.state.classByElementId.get(component.representationId)
+    currentClass.textContent = component === undefined ? 'Choose a component' : `Current: ${objectClass ?? 'Unassigned'} · session only`
+    classSelect.value = objectClass ?? ''
     classSelect.disabled = component === undefined
     assign.disabled = component === undefined
+    assign.textContent = objectClass === undefined ? 'Assign class' : 'Update class'
   }
   refresh()
   return { refresh }
@@ -145,6 +165,9 @@ export const classLayoutCss = `
   .class-layout-popover fieldset { min-width: 0; margin: 2px 0 0; border: 0; border-top: 1px solid var(--hairline); padding: 10px 0 0; }
   .class-layout-popover legend { padding: 0; }
   .class-layout-popover output { min-height: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+  #class-layout-current { font-size: 11px; color: var(--muted); }
+  #class-layout-feedback { font-size: 11px; white-space: normal; line-height: 1.5; color: var(--ink); }
+  #class-layout-feedback:empty { display: none; }
   .class-layout-range { display: grid; grid-template-columns: 1fr 26px; align-items: center; gap: 8px; }
   .class-layout-range output { text-align: right; }
   .class-layout-popover input[type="range"] { width: 100%; accent-color: var(--ink); }
