@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'bun:test'
 
 import {
+  classAssignmentFeedback,
   classLayoutControl,
   classLayoutCss,
   classLayoutOptions,
@@ -95,4 +96,17 @@ test.concurrent('direct component choice works without map selection and tracks 
   assert.equal(resolveClassComponentChoice(components, first, undefined, second.representationId), first.representationId)
   assert.equal(resolveClassComponentChoice(components, first, first.representationId, second.representationId), second.representationId)
   assert.equal(resolveClassComponentChoice(components, system, undefined, 'observed:gone'), undefined)
+})
+
+test.concurrent('assignment confirmation identifies the actual component, class, and session-only scope', () => {
+  assert.equal(classAssignmentFeedback('Static export', 'Dataset', 'class-clusters'), 'Assigned Static export → Dataset · session only')
+  assert.equal(classAssignmentFeedback('Static export', 'Dataset', 'default'), 'Assigned Static export → Dataset · session only · switch to Class clusters to see the shape')
+  assert.equal(classAssignmentFeedback('Static export', undefined, 'class-clusters'), 'Cleared class for Static export · session only')
+})
+
+test.concurrent('Layout exposes current assignment, status announcement, and focus-driven class feedback', () => {
+  const markup = classLayoutControl()
+  assert.match(markup, /id="class-layout-current"/)
+  assert.match(markup, /id="class-layout-feedback" role="status" aria-live="polite"/)
+  assert.match(markup, /id="class-layout-component"/)
 })
