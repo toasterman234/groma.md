@@ -86,10 +86,10 @@ test.concurrent('direct component choice works without map selection and tracks 
     box('first', 'component', unit, { parent: 'observed:system' }),
     box('second', 'component', unit, { parent: 'observed:system' }),
   ])
-  const first = world.world.elements.find(item => item.representationId === 'observed:first')!
-  const second = world.world.elements.find(item => item.representationId === 'observed:second')!
-  const system = world.world.elements.find(item => item.kind === 'system')!
-  const components = world.world.elements.filter(item => item.kind === 'component')
+  const first = world.elements.find(item => item.representationId === 'observed:first')!
+  const second = world.elements.find(item => item.representationId === 'observed:second')!
+  const system = world.elements.find(item => item.kind === 'system')!
+  const components = world.elements.filter(item => item.kind === 'component')
   assert.equal(resolveClassComponentChoice(components, system, undefined, first.representationId), first.representationId)
   assert.equal(resolveClassComponentChoice(components, undefined, undefined, second.representationId), second.representationId)
   assert.equal(resolveClassComponentChoice(components, first, undefined, second.representationId), first.representationId)
