@@ -31,6 +31,7 @@ This document is the follow-up to [master-repo-0.1 issue #162](https://github.co
 |---|---|---|---|
 | Data source / Tower | https://www.svgrepo.com/svg/352957/tower-server | CC0 | License checked; actual geometry/compatibility unreviewed |
 | Data source / Tower, Cabinet alternatives | https://www.svgrepo.com/collection/servers-isometric-icons/ | **Not one common license** — inspect each individual icon | Collection verified; individual assets unreviewed |
+| Data source / modular rack alternative | https://www.svgrepo.com/svg/474398/1u-server | CC0 (individual SVG page) | From the isometric-server family; SVG bytes and perspective not yet independently inspected |
 | Rules / Gavel | https://www.svgrepo.com/svg/418522/auction-gavel-judge | CC0 | License checked; artwork may be flat / visual fit unreviewed |
 | Rules / Gavel alternatives | https://www.svgrepo.com/vectors/gavel/ | Per-icon; inspect each | Search landing page only |
 | General source | https://www.svgrepo.com/collections/isometric/ | Per-icon; inspect each | Isometric collection directory |
