@@ -20,6 +20,7 @@ export interface ClassLayoutState {
 export interface ClassLayoutControlOptions {
   state: ClassLayoutState
   selected: () => AnnotatedElement | undefined
+  components: () => readonly AnnotatedElement[]
   apply: () => void
 }
 
@@ -56,9 +57,21 @@ export function retainClassAssignments(state: ClassLayoutState, world: Architect
   }
 }
 
+/** Chooses a concrete component even if the current map selection is a system, route, or group. */
+export function resolveClassComponentChoice(
+  components: readonly AnnotatedElement[],
+  mapSelected: AnnotatedElement | undefined,
+  previousMapId: string | undefined,
+  chosenId: string | undefined,
+): string | undefined {
+  const mapId = mapSelected?.kind === 'component' ? mapSelected.representationId : undefined
+  const proposed = mapId !== undefined && mapId !== previousMapId ? mapId : chosenId
+  return components.some(item => item.kind === 'component' && item.representationId === proposed) ? proposed : undefined
+}
+
 export function classLayoutControl(): string {
   const classes = SEMANTIC_OBJECT_CLASSES.map(objectClass => `<option value="${objectClass}">${objectClass}</option>`).join('')
-  return `<details id="class-layout" class="floating-map-bar"><summary aria-label="Presentation layout" title="Presentation layout"><span>Layout</span><span class="class-layout-chevron"></span></summary><div class="class-layout-popover" role="group" aria-label="Presentation layout controls"><label>Mode<select id="class-layout-mode"><option value="default">Original</option><option value="class-clusters">Class clusters</option></select></label><label>Sibling spacing<span class="class-layout-range"><input id="class-layout-sibling" type="range" min="2" max="12" step="1"><output for="class-layout-sibling"></output></span></label><label>Group spacing<span class="class-layout-range"><input id="class-layout-group" type="range" min="2" max="12" step="1"><output for="class-layout-group"></output></span></label><label>Island spacing<span class="class-layout-range"><input id="class-layout-island" type="range" min="3" max="16" step="1"><output for="class-layout-island"></output></span></label><fieldset><legend>Selected component</legend><output id="class-layout-selection" aria-live="polite"></output><label>Class<select id="class-layout-class"><option value="">Unassigned</option>${classes}</select></label><button id="class-layout-assign" type="button">Assign class</button></fieldset></div></details>`
+  return `<details id="class-layout" class="floating-map-bar"><summary aria-label="Presentation layout" title="Presentation layout"><span>Layout</span><span class="class-layout-chevron"></span></summary><div class="class-layout-popover" role="group" aria-label="Presentation layout controls"><label>Mode<select id="class-layout-mode"><option value="default">Original</option><option value="class-clusters">Class clusters</option></select></label><label>Sibling spacing<span class="class-layout-range"><input id="class-layout-sibling" type="range" min="2" max="12" step="1"><output for="class-layout-sibling"></output></span></label><label>Group spacing<span class="class-layout-range"><input id="class-layout-group" type="range" min="2" max="12" step="1"><output for="class-layout-group"></output></span></label><label>Island spacing<span class="class-layout-range"><input id="class-layout-island" type="range" min="3" max="16" step="1"><output for="class-layout-island"></output></span></label><fieldset><legend>Assign class</legend><label>Component<select id="class-layout-component"><option value="">Choose component</option></select></label><label>Class<select id="class-layout-class"><option value="">Unassigned</option>${classes}</select></label><button id="class-layout-assign" type="button">Assign class</button></fieldset></div></details>`
 }
 
 export function bindClassLayoutControl(host: HTMLElement, options: ClassLayoutControlOptions): ClassLayoutControlBinding {
@@ -69,7 +82,10 @@ export function bindClassLayoutControl(host: HTMLElement, options: ClassLayoutCo
   const ranges = [[sibling, 'siblingGap'], [group, 'groupGap'], [island, 'islandGap']] as const
   const classSelect = host.querySelector<HTMLSelectElement>('#class-layout-class')!
   const assign = host.querySelector<HTMLButtonElement>('#class-layout-assign')!
-  const selection = host.querySelector<HTMLOutputElement>('#class-layout-selection')!
+  const componentSelect = host.querySelector<HTMLSelectElement>('#class-layout-component')!
+  let chosenId: string | undefined
+  let previousMapId: string | undefined
+  const components = () => options.components().filter(item => item.kind === 'component')
   const updateSpacing = (): void => {
     for (const [input, key] of ranges) options.state.spacing[key] = Number(input.value)
     options.apply()
@@ -79,11 +95,15 @@ export function bindClassLayoutControl(host: HTMLElement, options: ClassLayoutCo
     options.apply()
   })
   for (const [input] of ranges) input.addEventListener('input', updateSpacing)
+  componentSelect.addEventListener('change', () => {
+    chosenId = componentSelect.value || undefined
+    refresh()
+  })
   assign.addEventListener('click', () => {
-    const selected = options.selected()
-    if (selected?.kind !== 'component') return
-    if (classSelect.value === '') options.state.classByElementId.delete(selected.representationId)
-    else options.state.classByElementId.set(selected.representationId, classSelect.value as SemanticObjectClass)
+    const component = components().find(item => item.representationId === chosenId)
+    if (component === undefined) return
+    if (classSelect.value === '') options.state.classByElementId.delete(component.representationId)
+    else options.state.classByElementId.set(component.representationId, classSelect.value as SemanticObjectClass)
     options.apply()
   })
   const refresh = (): void => {
@@ -92,9 +112,14 @@ export function bindClassLayoutControl(host: HTMLElement, options: ClassLayoutCo
       input.value = String(options.state.spacing[key])
       input.nextElementSibling!.textContent = input.value
     }
-    const selected = options.selected()
-    const component = selected?.kind === 'component' ? selected : undefined
-    selection.textContent = component?.title ?? 'Select a component on the map'
+    const list = components()
+    const mapSelected = options.selected()
+    chosenId = resolveClassComponentChoice(list, mapSelected, previousMapId, chosenId)
+    previousMapId = mapSelected?.kind === 'component' ? mapSelected.representationId : undefined
+    componentSelect.replaceChildren(new Option('Choose component', ''))
+    for (const component of list) componentSelect.add(new Option(component.title, component.representationId))
+    componentSelect.value = chosenId ?? ''
+    const component = list.find(item => item.representationId === chosenId)
     classSelect.value = component === undefined ? '' : options.state.classByElementId.get(component.representationId) ?? ''
     classSelect.disabled = component === undefined
     assign.disabled = component === undefined
