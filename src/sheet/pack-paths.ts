@@ -83,10 +83,12 @@ interface ArrowStrip extends StripEntry { arrow: Arrow; bit: number }
 /** Tracks which paths remain clear as placement adds siblings, without repricing old obstacles. */
 export class PackingPaths {
   private obstacles = new Buckets<StripEntry>()
+  private gap: number
   private strips = new Buckets<ArrowStrip>()
   private incident = new Map<string, Connection[]>()
 
-  constructor(items: readonly Partnered[], placed: ReadonlyMap<string, CellRect>) {
+  constructor(items: readonly Partnered[], placed: ReadonlyMap<string, CellRect>, gap = GAP) {
+    this.gap = gap
     for (const rect of placed.values()) this.obstacles.add({ rect })
     for (const item of items) {
       for (const [target, count] of item.partners) {
@@ -137,7 +139,7 @@ export class PackingPaths {
   }
 
   apart(rect: CellRect): boolean {
-    const padded = { gx: rect.gx - GAP, gy: rect.gy - GAP, w: rect.w + GAP * 2, d: rect.d + GAP * 2 }
+    const padded = { gx: rect.gx - this.gap, gy: rect.gy - this.gap, w: rect.w + this.gap * 2, d: rect.d + this.gap * 2 }
     return this.obstacles.query(padded).next().done === true
   }
 

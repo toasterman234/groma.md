@@ -15,6 +15,8 @@ groma:
     - scanner: typescript
       file: src/viewers/web/embedding.ts
       symbol: listenForEmbeddedViews
+    - scanner: typescript
+      file: src/viewers/web/chrome/class-layout.ts
   group: Browser session
 description: Keeps browser controls in sync with architecture and task state
 ---

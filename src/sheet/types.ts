@@ -18,6 +18,17 @@ export interface SheetItem {
 
 export type IslandKind = 'actors' | 'external' | 'system'
 
+/** Presentation-only semantic labels used by the exploratory class-cluster profile. */
+export type SemanticObjectClass =
+  | 'Dataset'
+  | 'Service'
+  | 'Decision'
+  | 'Artifact'
+  | 'Event'
+  | 'Project'
+  | 'Rule'
+  | 'Preference'
+
 /** A flat island on the sheet. Actors and external systems share one island each; every internal system has its own. */
 export interface Island {
   key: string
@@ -51,7 +62,7 @@ export interface Slab extends SheetItem {
 
 /** A component's block; an actor's round building; an external system's pill. */
 export type Shape =
-  { kind: 'block' | 'round' | 'pill' }
+  { kind: 'block' | 'round' | 'pill' | 'cylinder' | 'hex-prism' | 'stacked-slab' }
 
 /** Source files combined into one visible floor of a component building. */
 export interface BuildingFloor {
@@ -72,6 +83,10 @@ export interface Building extends SheetItem {
   rect: CellRect
   heightUnits: number
   shape: Shape
+  /** Presentation-only class assigned by a demo projection, never read as C4 meaning. */
+  objectClass?: SemanticObjectClass
+  /** Presentation-only family used to name class-cluster zones. */
+  visualGroup?: string
   floors: BuildingFloor[]
   /** The title as laid on the roof, one or two lines. */
   lines: string[]

@@ -200,6 +200,26 @@ function stadium(rect: CellRect): { radius: number; west: number; east: number; 
 }
 
 /** Points around a curved roof: the ring starts at the east cap's north, runs over its east to the south, and returns along the west cap. */
+export function cylinderOutline(rect: CellRect): { gx: number; gy: number }[] {
+  const radius = Math.min(rect.w, rect.d) / 2
+  const centre = { gx: rect.gx + rect.w / 2, gy: rect.gy + rect.d / 2 }
+  return Array.from({ length: ARC_STEPS * 2 }, (_, index) => {
+    const angle = -Math.PI / 2 + index * Math.PI / ARC_STEPS
+    return { gx: centre.gx + radius * Math.cos(angle), gy: centre.gy + radius * Math.sin(angle) }
+  })
+}
+
+export function hexPrismOutline(rect: CellRect): { gx: number; gy: number }[] {
+  return [
+    { gx: rect.gx + rect.w * 0.25, gy: rect.gy },
+    { gx: rect.gx + rect.w * 0.75, gy: rect.gy },
+    { gx: rect.gx + rect.w, gy: rect.gy + rect.d / 2 },
+    { gx: rect.gx + rect.w * 0.75, gy: rect.gy + rect.d },
+    { gx: rect.gx + rect.w * 0.25, gy: rect.gy + rect.d },
+    { gx: rect.gx, gy: rect.gy + rect.d / 2 },
+  ]
+}
+
 function roofOutline(rect: CellRect): { gx: number; gy: number }[] {
   const { radius, west, east, middle } = stadium(rect)
   const arc = (cx: number, from: number, to: number): { gx: number; gy: number }[] => Array.from(
@@ -263,6 +283,57 @@ function onVisibleBuilding(
  * extreme along the front, the part turned to the viewer. The band is the
  * left face for tint and pattern.
  */
+export function polygonPrismFaces(
+  outline: readonly { gx: number; gy: number }[],
+  z0: number,
+  z1: number,
+  view: ProjectionView = DEFAULT_PROJECTION,
+): Face[] {
+  const base = outline.map(point => project(point.gx, point.gy, z0, view))
+  const top = outline.map(point => project(point.gx, point.gy, z1, view))
+  const yaw = view.yaw * RAD
+  const depth = (point: { gx: number; gy: number }): number => point.gx * Math.sin(yaw) + point.gy * Math.cos(yaw)
+  const centreDepth = outline.reduce((sum, point) => sum + depth(point), 0) / outline.length
+  const centre = project(
+    outline.reduce((sum, point) => sum + point.gx, 0) / outline.length,
+    outline.reduce((sum, point) => sum + point.gy, 0) / outline.length,
+    (z0 + z1) / 2, view,
+  )
+  const walls: Face[] = []
+  for (let index = 0; index < outline.length; index += 1) {
+    const next = (index + 1) % outline.length
+    const midpoint = {
+      gx: (outline[index]!.gx + outline[next]!.gx) / 2,
+      gy: (outline[index]!.gy + outline[next]!.gy) / 2,
+    }
+    if (depth(midpoint) <= centreDepth) continue
+    const points = [base[index]!, base[next]!, top[next]!, top[index]!]
+    const side = points.reduce((sum, point) => sum + point.x, 0) / points.length < centre.x ? 'left' : 'right'
+    walls.push({ side, plane: side, points })
+  }
+  if (walls.length === 0) {
+    const points = [base[0]!, base[1]!, top[1]!, top[0]!]
+    walls.push({ side: 'right', plane: 'right', points })
+  }
+  return [...walls.sort((left, right) => left.side === right.side ? 0 : left.side === 'left' ? -1 : 1), { side: 'top', points: top }]
+}
+
+export function stackedSlabFaces(
+  rect: CellRect,
+  z0: number,
+  z1: number,
+  view: ProjectionView = DEFAULT_PROJECTION,
+): Face[][] {
+  const tiers = 3
+  return Array.from({ length: tiers }, (_, index) => {
+    const inset = Math.min(0.28, Math.max(0, (Math.min(rect.w, rect.d) - 1) / 2)) * (tiers - index - 1) / tiers
+    const tier = { gx: rect.gx + inset, gy: rect.gy + inset, w: rect.w - 2 * inset, d: rect.d - 2 * inset }
+    const lower = z0 + (z1 - z0) * index / tiers
+    const upper = z0 + (z1 - z0) * (index + 1) / tiers
+    return boxFaces(tier, lower, upper, view)
+  })
+}
+
 function curvedFaces(
   outline: readonly { gx: number; gy: number }[],
   z0: number,
@@ -308,6 +379,15 @@ function sameFootprint(left: CellRect, right: CellRect): boolean {
 
 /** File floors rise from the ground on one centred tower axis. */
 function buildingFloors(building: Building, view: ProjectionView): Face[][] {
+  if (building.shape.kind === 'cylinder') {
+    return [curvedFaces(cylinderOutline(building.rect), 0, building.heightUnits, view)]
+  }
+  if (building.shape.kind === 'hex-prism') {
+    return [polygonPrismFaces(hexPrismOutline(building.rect), 0, building.heightUnits, view)]
+  }
+  if (building.shape.kind === 'stacked-slab') {
+    return stackedSlabFaces(building.rect, 0, building.heightUnits, view)
+  }
   if (curved(building.shape)) {
     return [curvedFaces(roofOutline(building.rect), 0, building.heightUnits, view)]
   }

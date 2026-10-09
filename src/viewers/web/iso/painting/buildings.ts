@@ -9,7 +9,7 @@ function classOf(projected: ProjectedBuilding): string {
   const { building } = projected
   const kind = building.kind === 'actor' ? 'actor' : building.external ? 'external' : 'component'
   const ghost = building.origin === 'observed' ? '' : ` ghost ${building.origin}`
-  return `building ${kind}${ghost}`
+  return `building ${kind} shape-${building.shape.kind}${ghost}`
 }
 
 /** Each file type contributes its two facade tiles once, before any building references them. */
@@ -49,7 +49,13 @@ function floorSvg(
 export function buildingsSvg(scene: ProjectedScene): SvgNode[] {
   return scene.buildings.map(projected => {
     const { building, floors, text } = projected
-    return node('g', { 'aria-label': building.title, 'data-id': building.representationId }, classOf(projected), [
+    const attributes = {
+      'aria-label': building.title,
+      'data-id': building.representationId,
+      ...(building.objectClass === undefined ? {} : { 'data-object-class': building.objectClass }),
+      ...(building.visualGroup === undefined ? {} : { 'data-visual-group': building.visualGroup }),
+    }
+    return node('g', attributes, classOf(projected), [
       ...floors.flatMap((faces, index) => floorSvg(projected, faces, building.floors[index])),
       surfaceText(text, buildingFont(building), 'label', scene.view),
     ])

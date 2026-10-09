@@ -1,4 +1,4 @@
-import { ENTRY_DRIFT, GAP, PARTNER_ALIGN, PARTNER_PULL, SIBLING_PUSH, SIBLING_SPREAD, SURFACE_GRAVITY } from './forces.ts'
+import { ENTRY_DRIFT, GAP, PARTNER_ALIGN, PARTNER_PULL, SIBLING_PUSH, SURFACE_GRAVITY } from './forces.ts'
 import { shelfAround, type Partnered, type Shelf } from './pack.ts'
 
 /** Rounds of the force balance. */
@@ -126,31 +126,31 @@ function forcePair(a: Body, b: Body, alongX: boolean, amount: number): void {
 }
 
 /** Every two siblings push apart until SIBLING_SPREAD cells of ground stand between them, partners too. */
-function push(bodies: readonly Body[]): void {
-  nearbyPairs(bodies, SIBLING_SPREAD, (a, b) => {
-    const { gap, alongX, sign } = gapBetween(a, b)
-    if (gap < SIBLING_SPREAD) forcePair(a, b, alongX, sign * SIBLING_PUSH * (SIBLING_SPREAD - gap))
+function push(bodies: readonly Body[], gap: number): void {
+  nearbyPairs(bodies, gap + 2, (a, b) => {
+    const { gap: actualGap, alongX, sign } = gapBetween(a, b)
+    if (actualGap < gap + 2) forcePair(a, b, alongX, sign * SIBLING_PUSH * (gap + 2 - actualGap))
     return false
   })
 }
 
 /** Partners pull toward the sibling gap across and toward facing each other along it. */
-function pull(springs: readonly Spring[]): void {
+function pull(springs: readonly Spring[], gap: number): void {
   for (const [a, b, count] of springs) {
-    const { gap, alongX, sign } = gapBetween(a, b)
-    if (gap > GAP) forcePair(a, b, alongX, -sign * PARTNER_PULL * count * (gap - GAP))
+    const { gap: actualGap, alongX, sign } = gapBetween(a, b)
+    if (actualGap > gap) forcePair(a, b, alongX, -sign * PARTNER_PULL * count * (actualGap - gap))
     const offset = alongX ? b.y - a.y : b.x - a.x
     forcePair(a, b, !alongX, -PARTNER_ALIGN * count * offset)
   }
 }
 
-function settleRound(bodies: readonly Body[], springs: readonly Spring[], step: number): void {
+function settleRound(bodies: readonly Body[], springs: readonly Spring[], step: number, gap: number): void {
   for (const body of bodies) {
     body.fx = 0
     body.fy = 0
   }
-  push(bodies)
-  pull(springs)
+  push(bodies, gap)
+  pull(springs, gap)
   const cx = bodies.reduce((sum, body) => sum + body.x, 0) / bodies.length
   const cy = bodies.reduce((sum, body) => sum + body.y, 0) / bodies.length
   for (const body of bodies) {
@@ -175,21 +175,21 @@ function keepEntriesWest(bodies: readonly Body[]): void {
 }
 
 /** Calls `fix` for every pair closer than the sibling gap, with the gap still missing; reports whether any was. */
-function tooClose(bodies: readonly Body[], fix: (a: Body, b: Body, missing: number, alongX: boolean, sign: number) => void): boolean {
+function tooClose(bodies: readonly Body[], gap: number, fix: (a: Body, b: Body, missing: number, alongX: boolean, sign: number) => void): boolean {
   let found = false
-  nearbyPairs(bodies, GAP, (a, b) => {
-    const { gap, alongX, sign } = gapBetween(a, b)
-    if (gap >= GAP - EPSILON) return false
+  nearbyPairs(bodies, gap, (a, b) => {
+    const { gap: actualGap, alongX, sign } = gapBetween(a, b)
+    if (actualGap >= gap - EPSILON) return false
     found = true
-    fix(a, b, GAP - gap, alongX, sign)
+    fix(a, b, gap - actualGap, alongX, sign)
     return true
   })
   return found
 }
 
 /** Pushes both bodies of a too-close pair apart, half each way, across their separating axis. */
-function separate(bodies: readonly Body[]): boolean {
-  return tooClose(bodies, (a, b, missing, alongX, sign) => {
+function separate(bodies: readonly Body[], gap: number): boolean {
+  return tooClose(bodies, gap, (a, b, missing, alongX, sign) => {
     const axis = alongX ? 'x' : 'y'
     b[axis] += sign * missing / 2
     a[axis] -= sign * missing / 2
@@ -200,8 +200,8 @@ function separate(bodies: readonly Body[]): boolean {
  * Once corners sit on whole cells, the east or south body of a too-close pair steps further east or south by whole
  * cells. Bodies only ever move east and south, so the sweeps end.
  */
-function separateCells(bodies: readonly Body[]): boolean {
-  return tooClose(bodies, (a, b, missing, alongX) => {
+function separateCells(bodies: readonly Body[], gap: number): boolean {
+  return tooClose(bodies, gap, (a, b, missing, alongX) => {
     const axis = alongX ? 'x' : 'y'
     const later = b[axis] >= a[axis] ? b : a
     later[axis] += Math.ceil(missing - EPSILON)
@@ -215,7 +215,7 @@ function separateCells(bodies: readonly Body[]): boolean {
  * them while nothing passes west of them. Pairs left closer than the sibling gap are then pushed apart and the corners snapped to whole cells;
  * those last pushes only move east or south. The same items and start always give the same placement.
  */
-export function balance(items: readonly Partnered[], start: Shelf): Shelf {
+export function balance(items: readonly Partnered[], start: Shelf, gap = GAP): Shelf {
   const bodies: Body[] = items.map(item => {
     const at = start.at.get(item.key)!
     return { x: at.gx + item.w / 2, y: at.gy + item.d / 2, w: item.w, d: item.d, entry: item.entry, fx: 0, fy: 0 }
@@ -227,13 +227,13 @@ export function balance(items: readonly Partnered[], start: Shelf): Shelf {
   }))
   // Without partners nothing pulls, and the growth placement stays.
   if (springs.length === 0) return start
-  for (let round = 0; round < ROUNDS; round += 1) settleRound(bodies, springs, STEP * (1 - round / ROUNDS))
-  for (let sweep = 0; sweep < SWEEPS && separate(bodies); sweep += 1) keepEntriesWest(bodies)
+  for (let round = 0; round < ROUNDS; round += 1) settleRound(bodies, springs, STEP * (1 - round / ROUNDS), gap)
+  for (let sweep = 0; sweep < SWEEPS && separate(bodies, gap); sweep += 1) keepEntriesWest(bodies)
   for (const body of bodies) {
     // Bodies the forces lined up can differ by rounding error; the tolerance keeps them on the same cell.
     body.x = Math.round(body.x - body.w / 2 + 1e-3) + body.w / 2
     body.y = Math.round(body.y - body.d / 2 + 1e-3) + body.d / 2
   }
-  while (separateCells(bodies)) { /* until no pair is too close */ }
+  while (separateCells(bodies, gap)) { /* until no pair is too close */ }
   return shelfAround(new Map(bodies.map((body, i) => [items[i]!.key, { gx: body.x - body.w / 2, gy: body.y - body.d / 2, w: body.w, d: body.d }])))
 }

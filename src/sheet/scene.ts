@@ -1,6 +1,7 @@
 import type { ArchitectureGraph } from '../types.ts'
 import { mapRelationships } from './route/relationships.ts'
 import { placeWorld } from './place.ts'
+import type { SheetLayoutOptions } from './presentation.ts'
 import { routeAll, type Endpoint } from './route/route.ts'
 import type { SheetScene } from './types.ts'
 
@@ -21,9 +22,9 @@ export interface MeasuredSheetScene {
  * and orthogonal ground routes for the visible connections. Pure: the same world gives the same
  * sheet and the world is never touched.
  */
-export function measuredSheetScene(world: ArchitectureGraph): MeasuredSheetScene {
+export function measuredSheetScene(world: ArchitectureGraph, options: SheetLayoutOptions = {}): MeasuredSheetScene {
   const started = performance.now()
-  const placement = placeWorld(world)
+  const placement = placeWorld(world, options)
   const placed = performance.now()
   const endpoints = new Map<string, Endpoint>()
   for (const island of placement.islands) {
@@ -57,6 +58,6 @@ export function measuredSheetScene(world: ArchitectureGraph): MeasuredSheetScene
   }
 }
 
-export function sheetScene(world: ArchitectureGraph): SheetScene {
-  return measuredSheetScene(world).scene
+export function sheetScene(world: ArchitectureGraph, options: SheetLayoutOptions = {}): SheetScene {
+  return measuredSheetScene(world, options).scene
 }

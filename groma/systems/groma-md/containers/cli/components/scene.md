@@ -31,6 +31,8 @@ groma:
     - scanner: typescript
       file: src/sheet/pack-forces.ts
       symbol: balance
+    - scanner: typescript
+      file: src/sheet/presentation.ts
   group: Map layout
 description: Places systems, containers, groups and components on the shared map sheet
 ---
