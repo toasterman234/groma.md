@@ -105,7 +105,7 @@ export function bindClassLayoutControl(host: HTMLElement, options: ClassLayoutCo
 
 export const classLayoutCss = `
   #class-layout {
-    position: absolute; top: 74px; right: 24px; z-index: 7; display: block;
+    position: absolute; top: 74px; right: calc(var(--details-inset) + 24px); z-index: 7; display: block;
   }
   #class-layout > summary { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; cursor: pointer; list-style: none; }
   #class-layout > summary::-webkit-details-marker { display: none; }
