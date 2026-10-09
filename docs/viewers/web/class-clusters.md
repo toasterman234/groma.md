@@ -38,9 +38,13 @@ The exploratory shape vocabulary is:
 
 The projected geometry is shared by labels, selection groups, and relationship endpoint clipping. The typed spacing object keeps sibling, class-zone, and top-level island gaps explicit.
 
-## Current boundary
+## Web proof
 
-This prototype provides a typed in-memory API and focused fixture tests. It does not add a backend, Postgres integration, persisted object classes, or web settings controls. The existing map UI still uses its normal default scene entry point; browser/DOM verification is separate evidence and is not implied by the unit tests.
+Open the Groma web map and use **Layout** beside the Iso/2D/Layers control. **Original** keeps the normal map. **Class clusters** enables the exploratory profile; sibling, group, and island spacing retarget the existing map animation immediately. Select a component, choose one of the eight classes, and choose **Assign class**. The assignment is keyed by the selected component representation id, changes only the in-memory presentation profile, and does not infer from C4 `kind` or `technology`.
+
+Live world updates keep assignments whose component ids still exist and drop assignments for disappeared components. Returning to **Original** uses the server's normal sheet, so the default map and relationships remain unchanged.
+
+This prototype does not add a backend, Postgres integration, or persisted object classes. The control is included in the browser bundle; browser/DOM inspection remains separate evidence and is not implied by the unit tests.
 
 Focused evidence:
 

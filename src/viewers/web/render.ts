@@ -10,6 +10,7 @@ import { createAddControl } from './chrome/add.ts'
 import { createEmptyState } from './chrome/empty.ts'
 import { createMapDebugPanel } from './chrome/map-debug.ts'
 import { bindMapView } from './chrome/map-view.ts'
+import { bindClassLayoutControl, createClassLayoutState, retainClassAssignments, resolveClassLayoutSheet } from './chrome/class-layout.ts'
 import { bindC4Filter } from './chrome/c4-filter.ts'
 import { animateControl, animateContent } from './chrome/motion.ts'
 import { measureFrame, type MapFrame } from './chrome/frame.ts'
@@ -49,6 +50,9 @@ const data = createWebDataSource(boot)
 let world = boot.world
 let work = boot.work
 let sheet = boot.sheet
+let serverSheet = boot.sheet
+const classLayoutState = createClassLayoutState()
+let refreshClassLayout = (): void => {}
 let project: ProjectProfile | undefined = boot.project ?? undefined
 let currentPins = boot.pins
 let mapMeta = { generation: boot.generation, timings: boot.timings }
@@ -178,6 +182,7 @@ function paintViewState(commitUrl = true): void {
   paintHeaderSummary(statsHost, world, project)
   paintDetailsState(task)
   shell.paint(selection)
+  refreshClassLayout()
 }
 
 let paintedDetail = ''
@@ -390,6 +395,19 @@ function repaintScene(fit: boolean): void {
 
 const mapAnimator = createMapAnimator(mapMotion, repaintScene)
 const paintMapView = bindMapView(document.getElementById('map-view')!, mapAnimator.choose)
+function applyClassLayout(): void {
+  sheet = resolveClassLayoutSheet(serverSheet, world, classLayoutState)
+  mapAnimator.retarget(sheet)
+  scene = projectedScene()
+  repaintScene(true)
+  paintViewState(false)
+}
+const classLayout = bindClassLayoutControl(document.getElementById('class-layout')!, {
+  state: classLayoutState,
+  selected: () => worldElement(primarySelection(selection)),
+  apply: applyClassLayout,
+})
+refreshClassLayout = classLayout.refresh
 
 bindChromeActions({
   hud: toggleHud,
@@ -406,7 +424,9 @@ function applyWorld(payload: WebPayload, reset = false): void {
   world = payload.world
   changes.update(world, payload.comparison, payload.revision?.id, primarySelection(selection))
   work = payload.work
-  sheet = payload.sheet
+  serverSheet = payload.sheet
+  retainClassAssignments(classLayoutState, world)
+  sheet = resolveClassLayoutSheet(serverSheet, world, classLayoutState)
   project = payload.project ?? undefined
   currentPins = payload.pins
   emptyState.paint(world, project, !revisionControl.live) // Before measuring, so the fit leaves the card's new space.

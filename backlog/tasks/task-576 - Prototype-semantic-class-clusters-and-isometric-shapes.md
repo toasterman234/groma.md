@@ -1,10 +1,10 @@
 ---
 id: TASK-576
 title: Prototype semantic class clusters and isometric shapes
-status: Done
+status: In Progress
 assignee: []
 created_date: '2026-10-09 06:55'
-updated_date: '2026-10-09 07:03'
+updated_date: '2026-10-09 07:36'
 labels: []
 dependencies: []
 references:
@@ -18,9 +18,6 @@ references:
   - src/viewers/web/iso/painting/buildings.ts
   - src/sheet/forces.ts
 modified_files:
-  - task_plan.md
-  - findings.md
-  - progress.md
   - src/sheet/presentation.ts
   - src/sheet/types.ts
   - src/sheet/measure.ts
@@ -34,6 +31,19 @@ modified_files:
   - test-bun/semantic-class-clusters.test.ts
   - docs/viewers/web/class-clusters.md
   - docs/viewers/web/index.md
+  - task_plan.md
+  - findings.md
+  - progress.md
+  - src/viewers/web/chrome/class-layout.ts
+  - src/viewers/web/page.ts
+  - src/viewers/web/render.ts
+  - test-bun/web-class-layout.test.ts
+  - groma/systems/groma-md/components/class-layout.md
+  - groma/systems/groma-md/containers/export/components/class-layout.md
+  - groma/systems/groma-md/containers/export/components/render.md
+  - groma/systems/groma-md/components/sheet-presentation.md
+  - groma/systems/groma-md/containers/cli/components/sheet-presentation.md
+  - groma/systems/groma-md/containers/cli/components/scene.md
 priority: medium
 type: feature
 ordinal: 653000
@@ -67,6 +77,8 @@ This explicitly approved exploratory prototype tests a separate presentation pro
 
 <!-- SECTION:PLAN:BEGIN -->
 1. Trace current placement, measurement, projection, paint, UI view-mode, route, and test ownership; keep class meaning in a separate presentation profile/demo projection. 2. Add typed class shape/visual-group mapping and the three projected footprints while preserving unknown/default behavior. 3. Add opt-in class-clusters placement with typed sibling/group/island spacing and route-safe geometry, then expose only a bounded reusable demo/config surface if the existing UI can absorb it safely. 4. Add focused deterministic tests and usage documentation, run the repository check, inspect browser/DOM if available, review the diff, and leave the exploratory branch unmerged.
+
+3. Add a small in-memory web control beside Map view: Original/Class clusters toggle, sibling/group/island spacing inputs, and explicit class assignment for the selected existing element; retarget the existing map animator and preserve live payload resets.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -77,10 +89,16 @@ Governance and overlap review completed before implementation. Durable Explore r
 Implemented the typed exploratory presentation profile, class-clusters preset, sibling/group/island spacing options, cylinder/hex-prism/stacked-slab projected geometry, SVG metadata, focused regression tests, and usage docs. Focused evidence: 5/5 new tests, 39/39 existing sheet/route/projection tests, and bun run typecheck pass. Browser/DOM inspection remains unverified; no web settings controls were added because the supported surface is the typed in-memory API.
 
 Verification: focused affected suite passes 58/58 and bun run typecheck passes. Required bun run check exits 1 with 775 pass, 51 skip, 6 fail; every failure is a Swift worker build missing SwiftParser in the local CommandLineTools environment.
+
+Reconciled prior task-scoped root planning files after verifying their contents and ownership; Backlog TASK-576 is now the plan and evidence record.
+
+2026-10-09 follow-up: fixed the web renderer to retain serverSheet, refresh it from every live payload, and use it for Original; class-clusters still computes a separate sheet. Added resolveClassLayoutSheet and a regression covering toggle back to the exact initial sheet identity/geometry plus the latest live payload sheet. Verified bun run typecheck, focused class-layout/class-cluster tests (9/9), and git diff --check pass. Browser/DOM inspection remains UNVERIFIED; full bun run check is still pending.
+
+2026-10-09 final verification: full bun run check ran to completion and exited 1: 779 pass, 51 skip, 6 fail across 836 tests. All six failures are Swift worker tests blocked by the local environment's missing SwiftParser/Apple SDK modules; no task-owned class-layout test failed. The focused class-layout/class-cluster suite is 9/9 and typecheck passes. Browser proof was attempted by launching the local web map, but the available macOS window helper failed because its native helper binary is missing; browser/DOM proof remains UNVERIFIED. Groma scan outputs were folded into the existing render and scene owners; no stand-alone task-owned Groma components remain. Task remains In Progress.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Implemented the isolated exploratory semantic class-cluster presentation slice: explicit Dataset/Service/Decision/Artifact/Event/Project/Rule/Preference mapping, opt-in typed class-cluster spacing, cylinder/hex-prism/stacked-slab projection geometry, SVG metadata, focused tests, and usage docs. Verified with 58/58 affected tests, bun run typecheck, focused Biome lint, and git diff --check. Required bun run check completed with exit 1 (775 pass, 51 skip, 6 SwiftParser-blocked failures); browser/DOM inspection is explicitly UNVERIFIED. No UI settings, backend, Postgres, deployment, or production adoption was added.
+Implemented the isolated exploratory semantic class-cluster presentation slice: explicit Dataset/Service/Decision/Artifact/Event/Project/Rule/Preference mapping, opt-in typed class-cluster spacing, cylinder/hex-prism/stacked-slab projection geometry, in-memory Layout controls, SVG metadata, focused regressions, and usage docs. The renderer now preserves the latest server-delivered sheet for Original across toggles and live payloads. Verified typecheck, focused tests (9/9), and diff hygiene. Required bun run check exits 1 with 779 pass, 51 skip, and 6 SwiftParser/Apple SDK-blocked failures. Browser/DOM inspection is UNVERIFIED because the local macOS helper binary is unavailable. No merge, deploy, backend, Postgres integration, or production adoption was performed.
 <!-- SECTION:FINAL_SUMMARY:END -->
