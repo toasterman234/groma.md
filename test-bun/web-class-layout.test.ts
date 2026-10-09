@@ -75,6 +75,6 @@ test.concurrent('the map control exposes both layout modes, typed spacing, and a
 })
 
 test.concurrent('the Layout control clears the normal native details inspector', () => {
-  assert.match(classLayoutCss, /right: calc\\(var\\(--details-inset\\) \\+ 24px\\)/)
-  assert.match(classLayoutCss, /top: 74px; right: calc\\(var\\(--details-inset\\) \\+ 24px\\); z-index: 7/)
+  assert.match(classLayoutCss, /right: calc\(var\(--details-inset\) \+ 24px\)/)
+  assert.match(classLayoutCss, /top: 74px; right: calc\(var\(--details-inset\) \+ 24px\); z-index: 7/)
 })
