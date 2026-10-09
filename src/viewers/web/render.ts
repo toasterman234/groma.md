@@ -407,6 +407,7 @@ const classLayout = bindClassLayoutControl(document.getElementById('class-layout
   selected: () => worldElement(primarySelection(selection)),
   components: () => world.elements,
   apply: applyClassLayout,
+  focus: id => select(id),
 })
 refreshClassLayout = classLayout.refresh
 
