@@ -405,6 +405,7 @@ function applyClassLayout(): void {
 const classLayout = bindClassLayoutControl(document.getElementById('class-layout')!, {
   state: classLayoutState,
   selected: () => worldElement(primarySelection(selection)),
+  components: () => world.elements,
   apply: applyClassLayout,
 })
 refreshClassLayout = classLayout.refresh
