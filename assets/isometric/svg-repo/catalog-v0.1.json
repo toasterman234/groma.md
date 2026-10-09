@@ -1,0 +1,29 @@
+{
+  "schema_version": "svg-repo-archetype-intake-v0.1",
+  "authority": "presentation_only_noncanonical",
+  "upstream_intake": "docs/viewers/web/svg-repo-asset-intake-v0.1.md",
+  "assets": [
+    {
+      "id": "rules-gavel-flat-candidate",
+      "category": "Rules",
+      "archetype": "Gavel",
+      "asset_path": "assets/isometric/svg-repo/auction-gavel-judge-flat.svg",
+      "appearance": "flat_emblem_requires_isometric_platform",
+      "source_page_url": "https://www.svgrepo.com/svg/418522/auction-gavel-judge",
+      "publicly_mirrored_svg_url": "https://www.svgviewer.dev/s/434293/auction-gavel-judge",
+      "license": "CC0-1.0",
+      "source_reported_license": "CC0 License",
+      "upstream_sha256": null,
+      "curated_sha256": "fcfa11e705404436a6f711016bb56dc172d773d0fbe7a7aca6c017e4f62a8a5f",
+      "curated_file_bytes": 2401,
+      "modification": "Removed XML declaration, comments, presentation-only width/height; converted inline fill styles to fill attributes; kept existing paths, shapes, orientation and fills.",
+      "safety_review": "allowed_svg_path_rect_polygon_only; no scripts, foreignObject, hyperlinks, CSS, remote requests, event handlers, filters or external assets",
+      "import_status": "asset_imported_not_rendered",
+      "visual_review": "renders as a flat colored 2D gavel and striking base",
+      "runtime_scope": "none",
+      "object_bindings": [],
+      "connection_geometry": "not_implemented",
+      "browser_validation": "not_performed"
+    }
+  ]
+}
