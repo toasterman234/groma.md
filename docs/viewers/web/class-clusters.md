@@ -1,0 +1,50 @@
+# Semantic class-cluster prototype
+
+This is an exploratory Groma presentation slice, not a replacement architecture model.
+
+## Meaning boundary
+
+The architecture remains the same OKF/C4 world: elements keep their existing `kind`, parent, relationship, and `technology` values. A presentation profile is supporting Groma-specific knowledge supplied at render time. An ordinary Markdown reader therefore sees no new ontology field; Groma interprets the profile only when composing the sheet.
+
+The profile's `classByElementId` map is an explicit demo projection. `Dataset`, `Service`, `Decision`, `Artifact`, `Event`, `Project`, `Rule`, and `Preference` are presentation classes, not C4 abstractions. Their `shapeByClass` and `visualGroupByClass` entries own only visual encoding and zone labels.
+
+## In-memory usage
+
+```ts
+import { sheetScene } from '../../../src/sheet/scene.ts'
+import { createPresentationProfile } from '../../../src/sheet/presentation.ts'
+
+const presentation = createPresentationProfile({
+  'observed:orders': 'Dataset',
+  'observed:api': 'Service',
+})
+
+const scene = sheetScene(world, {
+  layout: 'class-clusters',
+  presentation,
+  spacing: { siblingGap: 4, groupGap: 5, islandGap: 6 },
+})
+```
+
+`sheetScene(world)` remains the default layout and default C4-kind shape behavior. Unknown or unmapped classes use the existing fallback: actors are round, external systems are pills, and other elements are blocks. The class-cluster preset groups mapped siblings into visible family zones and routes the resulting scene through the existing route solver.
+
+The exploratory shape vocabulary is:
+
+- `Dataset` and `Preference`: cylinder
+- `Service` and `Rule`: hexagonal prism
+- `Decision`: stacked slab
+- `Artifact` and `Project`: block
+- `Event`: pill
+
+The projected geometry is shared by labels, selection groups, and relationship endpoint clipping. The typed spacing object keeps sibling, class-zone, and top-level island gaps explicit.
+
+## Current boundary
+
+This prototype provides a typed in-memory API and focused fixture tests. It does not add a backend, Postgres integration, persisted object classes, or web settings controls. The existing map UI still uses its normal default scene entry point; browser/DOM verification is separate evidence and is not implied by the unit tests.
+
+Focused evidence:
+
+```sh
+bun test --timeout 20000 test-bun/semantic-class-clusters.test.ts
+bun run typecheck
+```

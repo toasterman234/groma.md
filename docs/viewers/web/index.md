@@ -1,6 +1,8 @@
 # Web viewer
 
 The web plugin shows groma.md's world in a browser. `groma web` starts it.
+
+The isolated semantic class-cluster presentation prototype is documented in [class-clusters.md](class-clusters.md); it is an in-memory opt-in API, not the default web map.
 If the architecture directory, index, or project record is missing, the local server
 shows browser setup for the project name and architecture folder. An existing
 folder keeps its location. Continue uses the shared initialization operation,

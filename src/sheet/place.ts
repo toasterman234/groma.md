@@ -1,7 +1,8 @@
 import { compareSemanticElements } from '../element-order.ts'
 import type { AnnotatedElement, AnnotatedRelationship, ArchitectureGraph } from '../types.ts'
 import { composePlacement } from './compose.ts'
-import { GAP, ISLAND_GAP, NESTED_CONTENT_PAD } from './forces.ts'
+import { GAP, NESTED_CONTENT_PAD } from './forces.ts'
+import { objectClassOf, resolveSheetLayoutOptions, shapeFor, visualGroupFor, type ResolvedSheetLayoutOptions, type SheetLayoutOptions } from './presentation.ts'
 import { MARGIN, PAD, shadeOf, translate, unionRects } from './grid.ts'
 import {
   ISLAND_FONT,
@@ -46,7 +47,7 @@ interface Node {
   connections: number
   children: { node: Node; gx: number; gy: number }[]
   paint:
-    | { kind: 'building'; element: AnnotatedElement; heightUnits: number; shape: Shape; floors: BuildingFloor[]; lines: string[] }
+    | { kind: 'building'; element: AnnotatedElement; heightUnits: number; shape: Shape; objectClass?: Building['objectClass']; visualGroup?: string; floors: BuildingFloor[]; lines: string[] }
     | { kind: 'slab'; element: AnnotatedElement }
     | { kind: 'zone'; name: string; members: string[]; unidentifiedContainer?: true }
     | { kind: 'island'; islandKind: IslandKind; name: string; element: AnnotatedElement | null }
@@ -69,10 +70,13 @@ function item(element: AnnotatedElement): SheetItem {
   }
 }
 
-function buildingNode(element: AnnotatedElement, ranges: FileMeasureRanges, degree: number): Node {
-  const shape: Shape = element.kind === 'actor'
+function buildingNode(element: AnnotatedElement, ranges: FileMeasureRanges, degree: number, profile: ResolvedSheetLayoutOptions['presentation']): Node {
+  const fallback: Shape = element.kind === 'actor'
     ? { kind: 'round' }
     : element.external ? { kind: 'pill' } : { kind: 'block' }
+  const shape = shapeFor(profile, element, fallback)
+  const objectClass = objectClassOf(profile, element)
+  const visualGroup = visualGroupFor(profile, element)
   const size = buildingFont(element)
   const lines = shape.kind === 'pill' ? [element.title] : roofLines(element.title, size)
   const base = footprintOf(lines, shape, degree, size)
@@ -84,12 +88,12 @@ function buildingNode(element: AnnotatedElement, ranges: FileMeasureRanges, degr
     : floors.reduce((total, floor) => total + floor.heightUnits, 0) || 1
   const w = Math.max(base.w, ...floors.map(floor => floor.footprint.w))
   const d = Math.max(base.d, ...floors.map(floor => floor.footprint.d))
-  return { key: element.representationId, w, d, connections: degree, children: [], paint: { kind: 'building', element, heightUnits, shape, floors, lines } }
+  return { key: element.representationId, w, d, connections: degree, children: [], paint: { kind: 'building', element, heightUnits, shape, objectClass, visualGroup, floors, lines } }
 }
 
 /** Reserve a node's connection fan beyond the minimum gap already supplied by packing. */
-function routeMargin(node: Node): number {
-  return Math.max(0, routeReach(node.connections) - GAP / 2)
+function routeMargin(node: Node, siblingGap: number): number {
+  return Math.max(0, routeReach(node.connections) - siblingGap / 2)
 }
 
 function subtreeConnections(key: string, children: readonly Node[], relationships: readonly Pick<AnnotatedRelationship, 'source' | 'target'>[]): number {
@@ -156,6 +160,7 @@ function packed(
   paint: Node['paint'],
   relationships: readonly Pick<AnnotatedRelationship, 'source' | 'target'>[],
   stack = false,
+  gap = GAP,
 ): Node {
   const { entries, partners } = lifted(children, relationships)
   /**
@@ -166,12 +171,12 @@ function packed(
   const behind = (child: Node): number => (child.paint.kind === 'building' ? shadeOf(child.paint.heightUnits) : 0)
   const items: Partnered[] = children.map(child => ({
     key: child.key,
-    w: child.w + behind(child) + 2 * routeMargin(child),
-    d: child.d + behind(child) + 2 * routeMargin(child),
+    w: child.w + behind(child) + 2 * routeMargin(child, gap),
+    d: child.d + behind(child) + 2 * routeMargin(child, gap),
     entry: entries.has(child.key),
     partners: partners.get(child.key)!,
   }))
-  const placed = stack ? shelf(items, 1) : balance(items, grow(items))
+  const placed = stack ? shelf(items, 1, gap) : balance(items, grow(items, gap), gap)
   /** Systems, slabs and zones share the roomier nested-surface inset; the centred actors and external islands stay compact. */
   const connections = subtreeConnections(key, children, relationships)
   const ownPorts = connectionCounts(relationships).get(key) ?? 0
@@ -187,7 +192,7 @@ function packed(
     d: Math.max(placed.d + 2 * extra + labelBand(font), portSide),
     children: children.map(child => {
       const at = placed.at.get(child.key)!
-      return { node: child, gx: at.gx + behind(child) + routeMargin(child) + extra, gy: at.gy + behind(child) + routeMargin(child) + extra }
+      return { node: child, gx: at.gx + behind(child) + routeMargin(child, gap) + extra, gy: at.gy + behind(child) + routeMargin(child, gap) + extra }
     }),
     paint,
   }
@@ -224,8 +229,10 @@ function withZones(
   siblings: readonly Node[],
   elements: readonly AnnotatedElement[],
   relationships: readonly Pick<AnnotatedRelationship, 'source' | 'target'>[],
+  options: ResolvedSheetLayoutOptions,
 ): Node[] {
-  const groupOf = new Map(elements.map(element => [element.representationId, element.group]))
+  const groupOf = new Map(elements.map(element => [element.representationId,
+    options.layout === 'class-clusters' ? visualGroupFor(options.presentation, element) : element.group]))
   const buckets = new Map<string, { group: string | undefined; nodes: Node[] }>()
   for (const node of siblings) {
     const group = groupOf.get(node.key)
@@ -236,10 +243,12 @@ function withZones(
   }
   return [...buckets].map(([key, { group, nodes }]) => group === undefined
     ? nodes[0]!
-    : packed(key, nodes, { kind: 'zone', name: group, members: nodes.map(member => member.key) }, relationships))
+    : packed(key, nodes, { kind: 'zone', name: group, members: nodes.map(member => member.key) }, relationships, false,
+      options.layout === 'class-clusters' ? options.spacing.groupGap : options.spacing.siblingGap))
 }
 
-export function placeWorld(world: ArchitectureGraph): Placement {
+export function placeWorld(world: ArchitectureGraph, inputOptions: SheetLayoutOptions = {}): Placement {
+  const options = resolveSheetLayoutOptions(inputOptions)
   const relationships = mapRelationships(world)
   const degree = connectionCounts(relationships)
   const ranges = fileMeasureRanges(world.elements)
@@ -248,32 +257,32 @@ export function placeWorld(world: ArchitectureGraph): Placement {
     .sort(compareSemanticElements)
 
   const building = (element: AnnotatedElement): Node =>
-    buildingNode(element, ranges, degree.get(element.representationId) ?? 0)
+    buildingNode(element, ranges, degree.get(element.representationId) ?? 0, options.presentation)
   const slab = (container: AnnotatedElement): Node => {
     const components = childrenOf(container.representationId).filter(child => child.kind === 'component')
     return packed(
       container.representationId,
-      withZones(container.representationId, components.map(building), components, relationships),
+      withZones(container.representationId, components.map(building), components, relationships, options),
       { kind: 'slab', element: container },
-      relationships,
+      relationships, false, options.spacing.siblingGap,
     )
   }
   const systemIsland = (system: AnnotatedElement): Node => {
     const children = childrenOf(system.representationId)
     const containers = children.filter(child => child.kind === 'container')
     const components = children.filter(child => child.kind === 'component')
-    const surfaces = withZones(system.representationId, containers.map(slab), containers, relationships)
+    const surfaces = withZones(system.representationId, containers.map(slab), containers, relationships, options)
     if (components.length > 0) {
       surfaces.push(packed(`unidentified:${system.representationId}`, components.map(building), {
         kind: 'zone', name: 'Unidentified container', unidentifiedContainer: true,
         members: components.map(component => component.representationId),
-      }, relationships))
+      }, relationships, false, options.layout === 'class-clusters' ? options.spacing.groupGap : options.spacing.siblingGap))
     }
     return packed(
       system.representationId,
       surfaces,
       { kind: 'island', islandKind: 'system', name: system.title, element: system },
-      relationships,
+      relationships, false, options.spacing.siblingGap,
     )
   }
   const roots = childrenOf(null)
@@ -284,17 +293,17 @@ export function placeWorld(world: ArchitectureGraph): Placement {
   const islands: Node[] = []
   if (actors.length > 0) {
     islands.push(centredIsland(packed(ACTORS_ISLAND, actors.map(building),
-      { kind: 'island', islandKind: 'actors', name: 'Actors', element: null }, relationships, true)))
+      { kind: 'island', islandKind: 'actors', name: 'Actors', element: null }, relationships, true, options.spacing.siblingGap)))
   }
   const systemIslands = systems.map(systemIsland)
   const externalIslands = externals.length === 0 ? [] : [centredIsland(packed(EXTERNAL_ISLAND, externals.map(building),
-    { kind: 'island', islandKind: 'external', name: 'External systems', element: null }, relationships, true))]
+    { kind: 'island', islandKind: 'external', name: 'External systems', element: null }, relationships, true, options.spacing.siblingGap))]
   const all = [...islands, ...systemIslands, ...externalIslands]
   const { entries, edges } = lifted(all, relationships)
   const ranks = flowRanks(all.map(island => island.key), entries, edges)
   const rankOf = (island: Node): number => ranks.get(island.key) ?? Number.MAX_SAFE_INTEGER
   islands.push(...systemIslands.sort((a, b) => rankOf(a) - rankOf(b)), ...externalIslands)
-  return composePlacement(collect(islands, placeRow(islands, relationships)), relationships)
+  return composePlacement(collect(islands, placeRow(islands, relationships, options.spacing.islandGap)), relationships)
 }
 
 /**
@@ -303,14 +312,14 @@ export function placeWorld(world: ArchitectureGraph): Placement {
  * cells apart; then the actors and external islands slide along gy so the
  * centre of their buildings faces the centre of what those buildings talk to.
  */
-function placeRow(islands: readonly Node[], relationships: readonly Pick<AnnotatedRelationship, 'source' | 'target'>[]): CellRect[] {
+function placeRow(islands: readonly Node[], relationships: readonly Pick<AnnotatedRelationship, 'source' | 'target'>[], islandGap: number): CellRect[] {
   const deepest = Math.max(0, ...islands.map(island => island.d))
   const origins: CellRect[] = []
   let gx = 0
   for (const [index, island] of islands.entries()) {
     origins.push({ gx, gy: Math.round((deepest - island.d) / 2), w: island.w, d: island.d })
     const next = islands[index + 1]
-    gx += island.w + Math.max(ISLAND_GAP, routeReach(island.connections) + routeReach(next?.connections ?? 0))
+    gx += island.w + Math.max(islandGap, routeReach(island.connections) + routeReach(next?.connections ?? 0))
   }
   const rects = new Map<string, CellRect>()
   const islandOf = new Map<string, string>()
@@ -375,6 +384,8 @@ function collect(islands: readonly Node[], origins: readonly CellRect[]): Placem
         rect,
         heightUnits: paint.heightUnits,
         shape: paint.shape,
+        objectClass: paint.objectClass,
+        visualGroup: paint.visualGroup,
         floors: paint.floors,
         lines: paint.lines,
       })

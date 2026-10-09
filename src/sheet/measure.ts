@@ -219,8 +219,8 @@ export function areaUnitsOf(
   return share === undefined ? 0 : Math.round(MAX_AREA_UNITS * share)
 }
 
-/** An actor's round building or an external system's pill: one curved tier. */
-export const curved = (shape: Shape): boolean => shape.kind === 'round' || shape.kind === 'pill'
+/** Curved footprints use the projected ring geometry rather than rectangular faces. */
+export const curved = (shape: Shape): boolean => shape.kind === 'round' || shape.kind === 'pill' || shape.kind === 'cylinder'
 
 /** The name's block on a roof in plane pixels: the longest line with ROOF_PAD around it, one ROOF_LINE_HEIGHT per line. */
 export function roofBlock(lines: readonly string[], size = ROOF_FONT): { w: number; d: number } {
@@ -239,7 +239,7 @@ export function footprintOf(
 ): { w: number; d: number } {
   const block = roofBlock(lines, size)
   const portSide = Math.ceil(portSideCells(degree))
-  if (shape.kind === 'round') {
+  if (shape.kind === 'round' || shape.kind === 'cylinder') {
     const side = Math.max(MIN_SIDE, portSide, Math.ceil(Math.hypot(block.w, block.d) / PLANE))
     return { w: side, d: side }
   }
